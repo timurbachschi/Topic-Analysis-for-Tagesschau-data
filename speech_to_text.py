@@ -3,6 +3,7 @@ from pathlib import Path
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 import speech_recognition as sr
+from timeit import default_timer as timer
 
 
 def speech_to_text(path):
@@ -17,11 +18,15 @@ def speech_to_text(path):
     """
     recognizer = sr.Recognizer()
     sound_file = AudioSegment.from_mp3(path)
+    # Divide mp3 into chunks (speech2text only works for <1min input) based on pauses.
+    # This might not always work out as intended.
     audio_chunks = split_on_silence(sound_file, min_silence_len=300, silence_thresh=-44)
-    Path("episodes").mkdir(parents=True, exist_ok=True)
-    with open("test.txt", "w") as f:
+    Path("chunks").mkdir(parents=True, exist_ok=True)
+    Path("transcripts").mkdir(parents=True, exist_ok=True)
+    with open("transcripts/test.txt", "w") as f:
         for i, chunk in enumerate(audio_chunks):
             try:
+                # TODO: Is there a way to do this without saving the chunks?
                 chunk.export("chunks/chunk_{}.wav".format(i), format="wav")
                 with sr.AudioFile("chunks/chunk_{}.wav".format(i)) as source:
                     audio = recognizer.record(source)
@@ -29,5 +34,4 @@ def speech_to_text(path):
                     f.write(text)
             except sr.UnknownValueError:
                 continue
-
-#speech_to_text("episodes/tagesschau_14102020_2000_.mp3")
+            

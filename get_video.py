@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 import requests as req
 from bs4 import BeautifulSoup
+from datetime import date, datetime
+import pandas as pd
+
 
 
 def mp4_to_mp3(in_path, out_path):
@@ -52,3 +55,19 @@ def download_videos_by_date(date_str):
         out_path = "episodes/" + episode_title + ".mp3"
         mp4_to_mp3("tagesschau.mp4", out_path)
         os.remove("tagesschau.mp4")
+
+
+def download_videos_in_timeperiod(start_date, end_date):
+    """
+    Downloads all tagesschau episodes for a given time period.
+
+            Parameters:
+                    start_date (datetime): Start date for the time period
+                    end_date (datetime): End date for the time period
+
+            Returns:
+                    None
+    """
+    daterange = pd.date_range(start_date, end_date)
+    for date in daterange:
+        download_videos_by_date(date.strftime("%Y%m%d"))

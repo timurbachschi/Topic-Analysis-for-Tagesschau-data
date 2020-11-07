@@ -16,7 +16,9 @@ def transform_episode(in_path, out_path):
     directory = "episodes_{}".format(data_format)
     Path(directory).mkdir(parents=True, exist_ok=True)
     command = "ffmpeg -i {} -ab 160k -ac 2 -ar 44100 -vn {}".format(in_path, out_path)
-    subprocess.call(command, shell=True)
+    subprocess.run(command, shell=True)
+    #command = "ffmpeg -i {} -ar 16000 -af loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=-27.2:measured_TP=-14.4:measured_LRA=0.1:measured_thresh=-37.7:offset=-0.7:linear=true:print_format=summary -y {}".format(in_path, out_path)
+    #subprocess.run(command, shell=True)
 
 
 def transform_episodes(dir_path, data_format):
@@ -47,7 +49,11 @@ def download_video(path):
     if len(anchor_elems) > 0:
         download_link = anchor_elems[0]["href"]
         episode_title = "_".join(soup.find("h1").text.split(" "))[7:].replace(".", "").replace(":", "").replace("Uhr", "")
-        urllib.request.urlretrieve("https:" + download_link, 'episodes_mp4/{}.mp4'.format(episode_title))
+
+        try:
+            urllib.request.urlretrieve("https:" + download_link, 'episodes_mp4/{}.mp4'.format(episode_title))
+        except urllib.error.HTTPError:
+            print("Episode not available")
         return episode_title
     else:
         return None
@@ -67,12 +73,15 @@ def download_videos_by_date(date_str, transform=None):
     urls = get_video_urls_by_date(date_str)
     for url in urls:
         episode_title = download_video(url)
-        if transform:
+        if transform is not None and episode_title is not None:
             out_dir = "episodes_{}".format(transform)
             Path(out_dir).mkdir(parents=True, exist_ok=True)
             in_path = "episodes_mp4/{}.mp4".format(episode_title)
             out_path = "{}/{}.{}".format(out_dir, episode_title, transform)
-            transform_episode(in_path, out_path)
+            if transform:
+                transform_episode(in_path, out_path)
+            #    # Remove mp4
+            #    os.remove(in_path)
 
 
 def download_videos_in_timeperiod(start_date, end_date, transform=None):
@@ -89,6 +98,9 @@ def download_videos_in_timeperiod(start_date, end_date, transform=None):
     """
     daterange = pd.date_range(start_date, end_date)
     for date in daterange:
+        print("Download episodes: {}".format(date))
         download_videos_by_date(date.strftime("%Y%m%d"), transform)
 
-#download_videos_by_date("20201028", "mp3")
+#transform_episode("episodes_mp4/tagesschau_05112009_2000_.mp4", "episodes_flac/tagesschau_05112009_2000_.flac")
+#download_videos_in_timeperiod("20091226", "20161231") 
+

@@ -33,8 +33,17 @@ def speech_to_text(path):
                 with sr.AudioFile(chunk_path) as source:
                     (source_rate, source_sig) = wav.read(chunk_path)
                     duration_seconds = len(source_sig) / float(source_rate)
+                    # Split the chunk into smaller chunks if it is too long
                     if duration_seconds > 60:
                         print("Chunk too long!")
+                        seg = AudioSegment.from_wav(chunk_path)
+                        split_chunks = split_chunk(seg, duration_seconds)
+                        for i, new_chunk in enumerate(split_chunks):
+                            new_chunk.export('split_chunk{}.wav'.format(i), format="wav")
+                            audio_file = sr.AudioFile('split_chunk{}.wav'.format(i))
+                            audio = recognizer.record(audio_file)
+                            text = recognizer.recognize_google(audio_file, language="de-DE") + ". "
+                            f.write(text)
                     else:
                         audio = recognizer.record(source)
                         text = recognizer.recognize_google(audio, language="de-DE") + ". "
@@ -42,3 +51,15 @@ def speech_to_text(path):
             except sr.UnknownValueError:
                 print("Chunk not readable: {}".format(i))
 
+
+def split_chunk(chunk_audioseg, duration_sec):
+    # Divide chunk until it is small enough
+    if duration_sec > 60:
+        new_chunks = [chunk_audioseg[0:duration_sec*1000/2],
+                      chunk_audioseg[duration_sec*1000/2:duration_sec*1000]]
+        res = []
+        for chunk in new_chunks:
+            res.extend(split_chunk(chunk, duration_sec/2))
+        return res
+    else:
+        return [chunk_audioseg]

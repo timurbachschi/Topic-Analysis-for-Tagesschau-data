@@ -8,6 +8,7 @@ import requests as req
 from bs4 import BeautifulSoup
 from datetime import date, datetime
 import pandas as pd
+import shlex
 
 
 def measure_values_for_loudnorm(command):
@@ -48,9 +49,11 @@ def transform_episode(in_path, out_path):
     pre_run = "ffmpeg -i {} -ar 16000 -ab 160k -vn -af loudnorm=linear=true:print_format=summary -f null -".format(in_path)
     measured_Input, measured_True_Peak, measured_LRA = measure_values_for_loudnorm(pre_run)
     print("main run...")
+    fh = open("NUL","w")
     main_run = "ffmpeg -i {} -ar 16000 -ab 160k -vn -af loudnorm=I=-19:TP={}:LRA={}:measured_I={}:measured_TP={}:measured_LRA={}:linear=true:print_format=summary -y {}".format(in_path,measured_True_Peak,measured_LRA,measured_Input,measured_True_Peak,measured_LRA,out_path)
     print("main_run command:",main_run)
-    subprocess.run(main_run,shell=True)
+    subprocess.run(main_run,shell=True, stdout=fh, stderr=fh)
+    fh.close()
     #command = "ffmpeg -i {} -ar 16000 -af loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=-27.2:measured_TP=-14.4:measured_LRA=0.1:measured_thresh=-37.7:offset=-0.7:linear=true:print_format=summary -y {}".format(in_path, out_path)
     #subprocess.run(command, shell=True)
 

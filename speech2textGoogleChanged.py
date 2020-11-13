@@ -11,6 +11,7 @@ import shlex
 import re
 import datetime
 import subprocess
+from get_videoChanged import transform_episode
                             
 def speech_to_text(path):
     """
@@ -24,6 +25,7 @@ def speech_to_text(path):
     """
     data_format = (path.split('.')[1])
     print("data format is:",data_format)
+    print(path)
     print("path is:",path.split("/")[1].split(".")[0]+".txt")
     if str(path.split("/")[1].split(".")[0]+".txt") not in os.listdir("transcripts/"):
 
@@ -57,7 +59,7 @@ def speech_to_text(path):
                                 with sr.AudioFile(new_chunk_path) as split_source:
                                     audio = recognizer.record(split_source)
                                     text = recognizer.recognize_google(audio, language="de-DE") + ". "
-                                    print(text)
+                                    #print(text)
                                     f.write(text)
                         else:
                             audio = recognizer.record(source)
@@ -83,3 +85,18 @@ def split_chunk(chunk_audioseg, duration_sec):
     else:
         return [chunk_audioseg]
 
+
+def transcribe_from_daterange(start_date, end_date):
+    import pandas as pd
+    daterange = pd.date_range(start_date, end_date)
+    for date in daterange:
+        for filename in os.listdir("episodes_mp4"):
+            if date.strftime("%d%m%Y") in filename and "tagesschau" in filename and "Jahren" not in filename and "mit" not in filename:
+                print("Transcribe: {}".format(filename))
+                path_to_wav = "episodes_mp4/{}".format(filename.replace("mp4", "wav"))
+                transform_episode("episodes_mp4/{}".format(filename), path_to_wav)
+                speech_to_text(path_to_wav)
+                os.remove(path_to_wav)
+
+
+transcribe_from_daterange("20130321", "20140101") 

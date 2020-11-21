@@ -8,30 +8,69 @@ import requests as req
 from bs4 import BeautifulSoup
 from datetime import date, datetime
 import pandas as pd
+import shlex
+
+
+def measure_values_for_loudnorm(command):
+    pre_run_command = shlex.split(command)
+    print(pre_run_command)
+    process = subprocess.Popen(pre_run_command,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               universal_newlines=True)
+
+    stdout, stderr = process.communicate()
+    for line in stderr.split("\n"):
+        if "Input Integrated" in line:
+            measured_Input = re.search("-?[0-9]+.?[0-9]*", line)[0]
+    for line in stderr.split("\n"):
+        if "Input True Peak" in line:
+            measured_True_Peak = re.search("-?[0-9]+.?[0-9]*", line)[0]
+            print("mTP:", measured_True_Peak)
+            if float(measured_True_Peak) > 0:
+                measured_True_Peak = '0.0'
+            if float(measured_True_Peak) < -9:
+                measured_True_Peak = '-9.0'
+            print("mTP nachher:", measured_True_Peak)
+    for line in stderr.split("\n"):
+        if "Input LRA" in line:
+            measured_LRA = re.search("-?[0-9]+.?[0-9]*", line)[0]
+    print(measured_Input, measured_True_Peak, measured_LRA)
+    return measured_Input, measured_True_Peak, measured_LRA
 
 
 def transform_episode(in_path, out_path):
     # Transform one episode to specified dataformat (as given by the out path)
-    _, data_format = os.path.splitext(out_path)
+    data_format = 'flac'
+    print(data_format)
     directory = "episodes_{}".format(data_format)
     Path(directory).mkdir(parents=True, exist_ok=True)
-    command = "ffmpeg -i {} -ab 160k -ac 2 -ar 44100 -vn {}".format(in_path, out_path)
-    subprocess.run(command, shell=True)
-    #command = "ffmpeg -i {} -ar 16000 -af loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=-27.2:measured_TP=-14.4:measured_LRA=0.1:measured_thresh=-37.7:offset=-0.7:linear=true:print_format=summary -y {}".format(in_path, out_path)
-    #subprocess.run(command, shell=True)
+    pre_run = "ffmpeg -i {} -ar 16000 -ab 160k -vn -af loudnorm=linear=true:print_format=summary -f null -".format(
+        in_path)
+    measured_Input, measured_True_Peak, measured_LRA = measure_values_for_loudnorm(
+        pre_run)
+    print("main run...")
+    fh = open("NUL", "w")
+    main_run = "ffmpeg -i {} -ar 16000 -ab 160k -vn -af loudnorm=I=-19:TP={}:LRA={}:measured_I={}:measured_TP={}:measured_LRA={}:linear=true:print_format=summary -y {}".format(
+        in_path, measured_True_Peak, measured_LRA, measured_Input, measured_True_Peak, measured_LRA, out_path)
+    print("main_run command:", main_run)
+    subprocess.run(main_run, shell=True, stdout=fh, stderr=fh)
+    fh.close()
 
 
 def transform_episodes(dir_path, data_format):
     # Converts all episodes (in mp4) in one directory to given format (mp3 etc.) using ffmpeg
     for filename in os.listdir(dir_path):
         in_path = "{}/{}".format(dir_path, filename)
-        out_path = "{}/{}".format(directory, filename.replace("mp4", data_format))
+        out_path = "{}/{}".format(dir_path,
+                                  filename.replace("mp4", data_format))
         transform_episode(in_path, out_path)
 
 
 def get_video_urls_by_date(date_str):
     # Return set of all URls from given date (encoded as "yyyymmdd")
-    url = "https://www.tagesschau.de/multimedia/video/videoarchiv2~_date-{}.html".format(date_str)
+    url = "https://www.tagesschau.de/multimedia/video/videoarchiv2~_date-{}.html".format(
+        date_str)
     resp = req.get(url)
     soup = BeautifulSoup(resp.text, 'html.parser')
     video_urls = set()
@@ -42,6 +81,7 @@ def get_video_urls_by_date(date_str):
 
 def download_video(path):
     # Download tagesschau episode from given path.
+    episode_not_available = None
     resp = req.get(path)
     soup = BeautifulSoup(resp.text, 'html.parser')
     anchor_elems = soup.find_all("a", href=re.compile(r'.*h264.mp4'))
@@ -49,14 +89,16 @@ def download_video(path):
     if len(anchor_elems) > 0:
         download_link = anchor_elems[0]["href"]
         episode_title = "_".join(soup.find("h1").text.split(" "))[7:].replace(".", "").replace(":", "").replace("Uhr", "")
-
         try:
-            urllib.request.urlretrieve("https:" + download_link, 'episodes_mp4/{}.mp4'.format(episode_title))
+            urllib.request.urlretrieve(
+                "https:" + download_link, 'episodes_mp4/{}.mp4'.format(episode_title))
+            episode_not_available = False
         except urllib.error.HTTPError:
             print("Episode not available")
-        return episode_title
+            episode_not_available = True
+        return episode_title, episode_not_available
     else:
-        return None
+        return None, episode_not_available
 
 
 def download_videos_by_date(date_str, transform=None):
@@ -72,16 +114,20 @@ def download_videos_by_date(date_str, transform=None):
     """
     urls = get_video_urls_by_date(date_str)
     for url in urls:
-        episode_title = download_video(url)
-        if transform is not None and episode_title is not None:
-            out_dir = "episodes_{}".format(transform)
-            Path(out_dir).mkdir(parents=True, exist_ok=True)
-            in_path = "episodes_mp4/{}.mp4".format(episode_title)
-            out_path = "{}/{}.{}".format(out_dir, episode_title, transform)
-            if transform:
-                transform_episode(in_path, out_path)
-            #    # Remove mp4
-            #    os.remove(in_path)
+        episode_title, episode_not_available = download_video(url)
+        print(episode_title, episode_not_available)
+        if "tagesschau" in str(episode_title):
+            if str(episode_title+'.mp4') not in os.listdir("transcripts/"):
+                if transform is not None and episode_title is not None:
+                    out_dir = "episodes_{}".format('flac')
+                    Path(out_dir).mkdir(parents=True, exist_ok=True)
+                    in_path = "episodes_mp4/{}.mp4".format(episode_title)
+                    out_path = "{}/{}.{}".format(out_dir,
+                                                 episode_title, 'flac')
+                    if transform and episode_not_available == False:
+                        transform_episode(in_path, out_path)
+            else:
+                print(episode_title, "is already downloaded")
 
 
 def download_videos_in_timeperiod(start_date, end_date, transform=None):
@@ -100,7 +146,3 @@ def download_videos_in_timeperiod(start_date, end_date, transform=None):
     for date in daterange:
         print("Download episodes: {}".format(date))
         download_videos_by_date(date.strftime("%Y%m%d"), transform)
-
-#transform_episode("episodes_mp4/tagesschau_05112009_2000_.mp4", "episodes_flac/tagesschau_05112009_2000_.flac")
-#download_videos_in_timeperiod("20091226", "20161231") 
-

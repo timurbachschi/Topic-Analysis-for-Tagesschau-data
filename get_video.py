@@ -1,6 +1,5 @@
 """Module for downloading the episodes of tagesschau for further analysis in the project"""
 import re
-import urllib.request
 import subprocess
 import os
 from pathlib import Path
@@ -9,6 +8,10 @@ from bs4 import BeautifulSoup
 from datetime import date, datetime
 import pandas as pd
 import shlex
+import xml.etree.ElementTree as ET
+import urllib.request, json
+import xmltodict
+import urllib
 
 
 def measure_values_for_loudnorm(command):
@@ -146,3 +149,70 @@ def download_videos_in_timeperiod(start_date, end_date, transform=None):
     for date in daterange:
         print("Download episodes: {}".format(date))
         download_videos_by_date(date.strftime("%Y%m%d"), transform)
+
+
+def get_mediadata_json(soup):
+    # Gets mediadata in JSON format for an epidode loaded as a beautifulsoup object
+    attrs = soup.find('form', {"class": "seperateFields"}).attrs
+    for attr in attrs:
+        if "id" in attr:
+            video_id = attr.split("_")[1].replace("-entry", "")
+            mediajson_url = "https://www.tagesschau.de/multimedia/video/{}~mediajson.json".format(video_id)
+            import urllib.request, json 
+            with urllib.request.urlopen(mediajson_url) as json_url:
+                json_data = json.loads(json_url.read().decode())
+                return json_data
+    print("Something went wrong!")
+    return None
+
+
+def get_subtitles_from_url(subtitle_url):
+    # Return subtitles with timestamps based on URL for the subtitle XML found in the metadata JSON
+    feed = urllib.request.urlopen(subtitle_url)
+    tree = ET.parse(feed)
+    root = tree.getroot()
+    subtitles_list = []
+    for child in root[1][0]:
+        begin = child.attrib["begin"]
+        end = child.attrib["end"]
+        text = []
+        for y in child.itertext():
+            text.append(y)
+        subtitles_list.append((begin, " ".join(text).replace("\n", "").replace("  ", ""), end))
+    return subtitles_list
+
+
+def get_additional_metadata_for_daterange(start_date, end_date):
+    # Get subtitle and teaser text info of all episode in given date range ("%Y%m%d")
+    data_dict = {}
+    daterange = pd.date_range(start_date, end_date)
+    for date in daterange:
+        date_str = date.strftime("%Y%m%d")
+        urls = get_video_urls_by_date(date.strftime("%Y%m%d"))
+        for url in urls:
+            resp = req.get(url)
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            episode_title = "_".join(soup.find("h1").text.split(" "))[7:].replace(".", "").replace(":", "").replace("Uhr", "")
+            # Only get tagesschau episodes
+            if "tagesschau" in episode_title and "vor" not in episode_title and "Gebärdensprache" not in episode_title:
+                teaser = soup.findAll("p", {"class": "teasertext"})[0].get_text()
+                ep_id = None
+                # Get metadata first to find URL of subtitle XML
+                try:
+                    json_data = get_mediadata_json(soup)
+                    if "_subtitleUrl" in json_data:
+                        subtitle_url = "https://www.tagesschau.de{}".format(json_data["_subtitleUrl"])
+                        print(subtitle_url)
+                        try:
+                            subtitle_list = get_subtitles_from_url(subtitle_url)
+                            subtitle_text = "".join(filter(None, [x[1] for x in subtitle_list]))
+                        # Subtitle XML does not exist
+                        except urllib.error.HTTPError:
+                            data_dict[date_str] = (teaser, None)
+                        except ET.ParseError:
+                            data_dict[date_str] = (teaser, None)
+                    else:
+                        subtitle_text = None
+                    data_dict[date_str] = (teaser, subtitle_text)
+                except urllib.error.HTTPError:
+                    continue

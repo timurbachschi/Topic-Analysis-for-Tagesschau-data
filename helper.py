@@ -66,7 +66,7 @@ def transcripts_to_df(path_to_transcripts, save_df=False):
         df.to_csv("episodes.csv", index=False)
     return df
 
-def preprocess_df(dataframe):
+def preprocess_df(df):
     nlp = spacy.load('de_core_news_sm')
     non_nouns=[] # init array for all non-nouns found by spacy
 

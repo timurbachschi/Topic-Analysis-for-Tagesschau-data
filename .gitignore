@@ -10,3 +10,4 @@ __pycache__/speech_to_text.cpython-37.pyc
 localTranscriptions
 model
 NUL
+test_transcripts

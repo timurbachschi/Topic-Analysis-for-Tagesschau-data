@@ -113,14 +113,16 @@ def download_videos_by_date(date_str, transform=None):
                     transform (str): Transform downloaded videos to given format, None by default.
 
             Returns:
-                    None
+                    List of filenames for each episode.
     """
     urls = get_video_urls_by_date(date_str)
+    episode_filenames = []
     for url in urls:
         episode_title, episode_not_available = download_video(url)
         print(episode_title, episode_not_available)
         if "tagesschau" in str(episode_title):
             if str(episode_title+'.mp4') not in os.listdir("transcripts/"):
+                episode_filenames.append(str(episode_title+'.mp4'))
                 if transform is not None and episode_title is not None:
                     out_dir = "episodes_{}".format('flac')
                     Path(out_dir).mkdir(parents=True, exist_ok=True)
@@ -131,6 +133,7 @@ def download_videos_by_date(date_str, transform=None):
                         transform_episode(in_path, out_path)
             else:
                 print(episode_title, "is already downloaded")
+    return episode_filenames
 
 
 def download_videos_in_timeperiod(start_date, end_date, transform=None):

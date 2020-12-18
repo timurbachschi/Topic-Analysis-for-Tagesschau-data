@@ -6,17 +6,17 @@ import speech_recognition as sr
 from timeit import default_timer as timer
 import scipy.io.wavfile as wav
 import soundfile as sf
-import os
 import shlex
 import re
 import datetime
 import subprocess
-from get_video import transform_episode
-from vosk import Model, KaldiRecognizer, SetLogLevel
+from get_video import transform_episode, download_videos_by_date
+#from vosk import Model, KaldiRecognizer, SetLogLevel
 import sys
 import wave
 import ast
 import pandas as pd
+import os, shutil
 
 
 def speech_to_text(path):
@@ -101,7 +101,7 @@ def transcribe_long_chunk(chunk_path, chunk_duration, data_format, recognizer):
             return text
 
 
-def transcribe_from_daterange(start_date, end_date, vosk=False):
+def transcribe_from_daterange(start_date, end_date, vosk=False, download=False):
     """
     Transcribe all episodes found in episodes_mp4 dir for a range of dates.
 
@@ -109,13 +109,29 @@ def transcribe_from_daterange(start_date, end_date, vosk=False):
                     start_date (str): Start date (format "YYYYMMDD")
                     end_date (str): End date (format "YYYYMMDD")
                     vosk (bool): If True use VOSK instead of Google SR
+                    download (bool): If True, download each individual episode.
+                                    If False it is assumed the episodes are already downloaded
 
             Returns:
                     None
     """
     # Transcribe episodes from range of dates (format "YYYYMMDD"). Use vosk if vosk=True.
     daterange = pd.date_range(start_date, end_date)
+    filenames = []
     for date in daterange:
+        if download:
+            if download:
+                folder = 'episodes_mp4'
+                for filename in os.listdir(folder):
+                    file_path = os.path.join(folder, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        print('Failed to delete %s. Reason: %s' % (file_path, e))
+            filenames = download_videos_by_date(date.strftime("%Y%m%d"))
         for filename in os.listdir("episodes_mp4"):
             if date.strftime("%d%m%Y") in filename and "tagesschau" in filename and "Jahren" not in filename and "mit" not in filename:
                 print("Transcribe: {}".format(filename))
@@ -127,7 +143,6 @@ def transcribe_from_daterange(start_date, end_date, vosk=False):
                     speech_to_text_vosk(path_to_wav)
                 else:
                     speech_to_text(path_to_wav)
-                os.remove(path_to_wav)
 
 
 def speech_to_text_vosk(mp4_path):

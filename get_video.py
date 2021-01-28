@@ -15,6 +15,7 @@ import urllib
 
 
 def measure_values_for_loudnorm(command):
+    # TODO: What does this do?
     pre_run_command = shlex.split(command)
     print(pre_run_command)
     process = subprocess.Popen(pre_run_command,
@@ -43,9 +44,9 @@ def measure_values_for_loudnorm(command):
 
 
 def transform_episode(in_path, out_path):
-    # Transform one episode to specified dataformat (as given by the out path)
+    # Transform one episode to specified dataformat (as given by the out path).
+    # Use FFMPEG for this.
     data_format = 'flac'
-    print(data_format)
     directory = "episodes_{}".format(data_format)
     Path(directory).mkdir(parents=True, exist_ok=True)
     pre_run = "ffmpeg -i {} -ar 16000 -ab 160k -vn -af loudnorm=linear=true:print_format=summary -f null -".format(
@@ -92,6 +93,7 @@ def download_video(path):
     if len(anchor_elems) > 0:
         download_link = anchor_elems[0]["href"]
         episode_title = "_".join(soup.find("h1").text.split(" "))[7:].replace(".", "").replace(":", "").replace("Uhr", "")
+        # See if episode is actually accessible
         try:
             urllib.request.urlretrieve(
                 "https:" + download_link, 'episodes_mp4/{}.mp4'.format(episode_title))
@@ -160,6 +162,7 @@ def get_mediadata_json(soup):
     for attr in attrs:
         if "id" in attr:
             video_id = attr.split("_")[1].replace("-entry", "")
+            # Get URL of the tagesschau mediajson file that contains metadata
             mediajson_url = "https://www.tagesschau.de/multimedia/video/{}~mediajson.json".format(video_id)
             import urllib.request, json 
             with urllib.request.urlopen(mediajson_url) as json_url:
@@ -186,7 +189,16 @@ def get_subtitles_from_url(subtitle_url):
 
 
 def get_additional_metadata_for_daterange(start_date, end_date):
-    # Get subtitle and teaser text info of all episode in given date range ("%Y%m%d")
+        """
+        Get subtitle and teaser text info of all episode in given date range ("%Y%m%d")
+
+            Parameters:
+                    start_date (datetime): Start date from which metadata shall be extracted
+                    end_date (datetime): End date up to which metadata shall be extracted
+
+            Returns:
+                    Dictionary containing subtitles and "Themen der Sendung" for all episodes covered.
+    """
     data_dict = {}
     daterange = pd.date_range(start_date, end_date)
     for date in daterange:
@@ -205,7 +217,6 @@ def get_additional_metadata_for_daterange(start_date, end_date):
                     json_data = get_mediadata_json(soup)
                     if "_subtitleUrl" in json_data:
                         subtitle_url = "https://www.tagesschau.de{}".format(json_data["_subtitleUrl"])
-                        print(subtitle_url)
                         try:
                             subtitle_list = get_subtitles_from_url(subtitle_url)
                             subtitle_text = "".join(filter(None, [x[1] for x in subtitle_list]))
@@ -219,3 +230,4 @@ def get_additional_metadata_for_daterange(start_date, end_date):
                     data_dict[date_str] = (teaser, subtitle_text)
                 except urllib.error.HTTPError:
                     continue
+    return data_dict

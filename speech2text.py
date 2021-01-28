@@ -11,7 +11,6 @@ import re
 import datetime
 import subprocess
 from get_video import transform_episode, download_videos_by_date
-#from vosk import Model, KaldiRecognizer, SetLogLevel
 import sys
 import wave
 import ast
@@ -47,6 +46,7 @@ def speech_to_text(path):
             sound_file, min_silence_len=390, silence_thresh=-39)
         with open("transcripts/{}.txt".format(transcript_filename), "w") as f:
             for i, chunk in enumerate(audio_chunks):
+                # Try to transcribe readable chunks
                 try:
                     chunk_path = "chunks/chunk_{}.{}".format(i, data_format)
                     chunk.export(chunk_path, format=data_format)
@@ -120,60 +120,53 @@ def transcribe_from_daterange(start_date, end_date, vosk=False, download=False):
     filenames = []
     for date in daterange:
         if download:
-            if download:
-                folder = 'episodes_mp4'
-                for filename in os.listdir(folder):
-                    file_path = os.path.join(folder, filename)
-                    try:
-                        if os.path.isfile(file_path) or os.path.islink(file_path):
-                            os.unlink(file_path)
-                        elif os.path.isdir(file_path):
-                            shutil.rmtree(file_path)
-                    except Exception as e:
-                        print('Failed to delete %s. Reason: %s' % (file_path, e))
+            # Download episodes as mp4
+            folder = 'episodes_mp4'
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print('Failed to delete %s. Reason: %s' % (file_path, e))
             filenames = download_videos_by_date(date.strftime("%Y%m%d"))
+        # Transcribe (downloaded) episodes
         for filename in os.listdir("episodes_mp4"):
+            # Ignore "Tagesschau vor 20 Jahren"
             if date.strftime("%d%m%Y") in filename and "tagesschau" in filename and "Jahren" not in filename and "mit" not in filename:
                 print("Transcribe: {}".format(filename))
-                path_to_wav = "episodes_mp4/{}".format(
+                path_to_sound = "episodes_mp4/{}".format(
                     filename.replace("mp4", "wav"))
                 transform_episode(
-                    "episodes_mp4/{}".format(filename), path_to_wav)
+                    "episodes_mp4/{}".format(filename), path_to_sound)
                 if vosk == True:
-                    speech_to_text_vosk(path_to_wav)
+                    speech_to_text_vosk(path_to_sound)
                 else:
-                    speech_to_text(path_to_wav)
+                    speech_to_text(path_to_sound)
 
 
 def speech_to_text_vosk(mp4_path):
+    # Transcription using VOSK 
     # https://github.com/alphacep/vosk
-
     SetLogLevel(0)
     if not os.path.exists("model"):
         print("Please download the model from https://alphacephei.com/vosk/models and unpack as 'model' in the current folder.")
         exit(1)
-
     sample_rate = 16000
     model = Model("model")
     rec = KaldiRecognizer(model, sample_rate)
-
+    # Transform episode from mp4 to WAV
     process = subprocess.Popen(['ffmpeg', '-loglevel', 'quiet', '-i',
                                 mp4_path,
                                 '-ar', str(sample_rate), '-ac', '1', '-f', 's16le', '-'],
                                stdout=subprocess.PIPE)
-
     while True:
         data = process.stdout.read(4000)
         if len(data) == 0:
             break
-        if rec.AcceptWaveform(data):
-            pass
-            # print(rec.Result())
-        else:
-            pass
-            # print(rec.PartialResult())
-    import ast
-    # print(ast.literal_eval(rec.FinalResult())["text"])
+    # Save transcription
     path_to_txt = "transcripts_vosk/{}".format(
         mp4_path.replace("episodes_mp4/", "").replace("wav", "txt"))
     with open(path_to_txt, "w") as f:

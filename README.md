@@ -28,4 +28,5 @@ Applying LDA topic modelling and word embeddings to analyze topics covered in th
 * **transcriptions_wer/** - Random election of hand-transcribed episodes for WER calculation.
 
 ## Selection of results
-TODO
+![picture](result_plots_examples/progress.png)
+![picture](result_plots_examples/gb_tsne.png)

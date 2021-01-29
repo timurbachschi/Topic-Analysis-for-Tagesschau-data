@@ -150,6 +150,7 @@ def transcribe_from_daterange(start_date, end_date, vosk=False, download=False):
 def speech_to_text_vosk(mp4_path):
     # Transcription using VOSK 
     # https://github.com/alphacep/vosk
+    # Code adapted from VOSK repository.
     SetLogLevel(0)
     if not os.path.exists("model"):
         print("Please download the model from https://alphacephei.com/vosk/models and unpack as 'model' in the current folder.")

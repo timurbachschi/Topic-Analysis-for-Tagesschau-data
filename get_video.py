@@ -189,7 +189,7 @@ def get_subtitles_from_url(subtitle_url):
 
 
 def get_additional_metadata_for_daterange(start_date, end_date):
-        """
+    """
         Get subtitle and teaser text info of all episode in given date range ("%Y%m%d")
 
             Parameters:

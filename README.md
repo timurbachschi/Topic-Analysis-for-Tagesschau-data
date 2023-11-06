@@ -16,17 +16,6 @@ Applying LDA topic modelling and word embeddings to analyze topics covered in th
 * **word_embeddings.ipynb** - Example of how to train word2vec models on our transcriptions, align them and create t-SNE plots for visualization of term change over years.
 * **word_embedding_sanity_check.ipynb** - Quick sanity check of our word embedding approach compared to another more general German language word2vec model (https://devmount.github.io/GermanWordEmbeddings/).
 
-### Saved dataframes
-* **complete_df.csv** - Data set containing the original transcription with date plus metadata in form of subtitles and "Themen der Sendung"
-* **preprocessed_df.csv** - Data set containing the transcriptions with out preprocessing pipeline (see topicModeling.py) applied to.
-* **about_preprocessed.csv** - Preprocessed "Themen der Sendung" for word embedding sanity check.
-* **about_preprocessed_notlower.csv** - Preprocessed "Themen der Sendung" without converting to lowercase for word embedding sanity check.
-
-### Transcriptions
-* **transripts/** - Transcriptions of Tagesschau episodes.
-* **transcriptions_vosk/** - Small selection of transcriptions done with VOSK (https://alphacephei.com/vosk/) for calculating WER.
-* **transcriptions_wer/** - Random election of hand-transcribed episodes for WER calculation.
-
 ## Selection of results
 ![picture](result_plots_examples/progress.png)
 ![picture](result_plots_examples/gb_tsne.png)
